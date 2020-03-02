@@ -14,7 +14,7 @@ export PYTHONPATH="$PYTHONPATH:/home/navoni/tensorflow/models/research:/home/nav
 
 INPUT_TYPE=image_tensor
 PIPELINE_CONFIG_PATH=/home/navoni/Downloads/faster_rcnn_resnet50_coco_2018_01_28/pipeline.config
-TRAINED_CKPT_PREFIX=/home/navoni/Cowc_car_counting/models/model.ckpt-1264
+TRAINED_CKPT_PREFIX=/home/navoni/Cowc_car_counting/models/model.ckpt-1160
 EXPORT_DIR=/home/navoni/Cowc_car_counting/export/
 sudo python3 object_detection/export_inference_graph.py --input_type=${INPUT_TYPE}   --pipeline_config_path=${PIPELINE_CONFIG_PATH} --trained_checkpoint_prefix=${TRAINED_CKPT_PREFIX} --output_directory=${EXPORT_DIR}
 
@@ -30,7 +30,7 @@ os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 import argparse
 
 parser = argparse.ArgumentParser(description='Run object recognition')
-parser.add_argument('--modelpath', type=str,default='../export/',
+parser.add_argument('--modelpath', type=str,default='../export_1276/',
                     help='directory for frozen interference graph')
 parser.add_argument('--imagepath', default='../data/ml_test.jpg',
                     help='sum the integers (default: find the max)')
@@ -38,7 +38,7 @@ parser.add_argument('--imagepath', default='../data/ml_test.jpg',
 args = parser.parse_args()
 
 # Read the graph.
-with tf.gfile.FastGFile('../export/frozen_inference_graph.pb', 'rb') as f:
+with tf.gfile.FastGFile(args.modelpath+'frozen_inference_graph.pb', 'rb') as f:
     graph_def = tf.GraphDef()
     graph_def.ParseFromString(f.read())
 
@@ -51,6 +51,8 @@ with tf.Session() as sess:
 
     fname = str(args.imagepath).split('.png')[0]
     img = cv.imread(args.imagepath)
+
+    #img = cv.resize(img, (2220,2220))
     inp = cv.resize(img, (1024,600))
     inp = inp[:, :, [2, 1, 0]]  # BGR2RGB
 
@@ -60,19 +62,19 @@ with tf.Session() as sess:
                     sess.graph.get_tensor_by_name('detection_boxes:0'),
                     sess.graph.get_tensor_by_name('detection_classes:0')],
                    feed_dict={'image_tensor:0': inp.reshape(1, inp.shape[0], inp.shape[1], 3)})
-    img = cv.resize(img, (1024, 600))
+    #img = cv.resize(img, (1024,600))
     rows = img.shape[0]
     cols = img.shape[1]
     # Visualize detected bounding boxes.
     num_detections = int(out[0][0])
-    print(num_detections)
+    det=0
+    img = cv.resize(img, (cols,rows))
     for i in range(num_detections):
         classId = int(out[3][0][i])
         score = float(out[1][0][i])
-        print(score)
-
         bbox = [float(v) for v in out[2][0][i]]
-        if score >= 0.5:
+        if score >= 0.35:
+            det = det+1
             x = bbox[1] * cols
             y = bbox[0] * rows
             #right = x+60
@@ -80,9 +82,9 @@ with tf.Session() as sess:
             right = bbox[3] * cols
             bottom = bbox[2] * rows
             
-            cv.putText(img,str(score)[0:5], (int(x)+5, int(y)+5), cv.FONT_HERSHEY_SIMPLEX ,0.5, (0, 0, 255) , 1, cv.LINE_AA) 
-            cv.rectangle(img, (int(x), int(y)), (int(right), int(bottom)), (125, 255, 51), thickness=1)
-            #cv.circle(img, (int(x)+int((right-x)/2), int(y)+int((bottom-y)/2)), 7,(0, 0, 255), thickness=2)
+            cv.putText(img,str(score)[0:5], (int(x)+5, int(y)+5), cv.FONT_HERSHEY_SIMPLEX ,1, (0, 0, 255) , 2, cv.LINE_AA) 
+            #cv.rectangle(img, (int(x), int(y)), (int(right), int(bottom)), (125, 255, 51), thickness=2)
+            cv.circle(img, (int(x)+int((right-x)/2), int(y)+int((bottom-y)/2)), 7,(0, 0, 255), thickness=2)
 
-
+print('Cars detected : '+str(det))
 cv.imwrite(fname+'_annot.png', img)
